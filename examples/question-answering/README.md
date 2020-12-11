@@ -1,5 +1,3 @@
-
-
 ## SQuAD
 
 Based on the script [`run_squad.py`](https://github.com/huggingface/transformers/blob/master/examples/question-answering/run_squad.py).
@@ -7,17 +5,33 @@ Based on the script [`run_squad.py`](https://github.com/huggingface/transformers
 #### Fine-tuning BERT on SQuAD1.0
 
 This example code fine-tunes BERT on the SQuAD1.0 dataset. It runs in 24 min (with BERT-base) or 68 min (with BERT-large)
-on a single tesla V100 16GB.
+on a single tesla V100 16GB. The data for SQuAD can be downloaded with the following links and should be saved in a
+$SQUAD_DIR directory.
+
+* [train-v1.1.json](https://rajpurkar.github.io/SQuAD-explorer/dataset/train-v1.1.json)
+* [dev-v1.1.json](https://rajpurkar.github.io/SQuAD-explorer/dataset/dev-v1.1.json)
+* [evaluate-v1.1.py](https://github.com/allenai/bi-att-flow/blob/master/squad/evaluate-v1.1.py)
+
+And for SQuAD2.0, you need to download:
+
+- [train-v2.0.json](https://rajpurkar.github.io/SQuAD-explorer/dataset/train-v2.0.json)
+- [dev-v2.0.json](https://rajpurkar.github.io/SQuAD-explorer/dataset/dev-v2.0.json)
+- [evaluate-v2.0.py](https://worksheets.codalab.org/rest/bundles/0x6b567e1cf2e041ec80d7098f031c5c9e/contents/blob/)
 
 ```bash
-python run_qa.py \
+export SQUAD_DIR=/path/to/SQUAD
+
+python run_squad.py \
+  --model_type bert \
   --model_name_or_path bert-base-uncased \
-  --dataset_name squad \
   --do_train \
   --do_eval \
-  --per_device_train_batch_size 12 \
+  --do_lower_case \
+  --train_file $SQUAD_DIR/train-v1.1.json \
+  --predict_file $SQUAD_DIR/dev-v1.1.json \
+  --per_gpu_train_batch_size 12 \
   --learning_rate 3e-5 \
-  --num_train_epochs 2 \
+  --num_train_epochs 2.0 \
   --max_seq_length 384 \
   --doc_stride 128 \
   --output_dir /tmp/debug_squad/
@@ -37,17 +51,20 @@ Here is an example using distributed training on 8 V100 GPUs and Bert Whole Word
 
 ```bash
 python -m torch.distributed.launch --nproc_per_node=8 ./examples/question-answering/run_squad.py \
+    --model_type bert \
     --model_name_or_path bert-large-uncased-whole-word-masking \
-    --dataset_name squad \
     --do_train \
     --do_eval \
+    --do_lower_case \
+    --train_file $SQUAD_DIR/train-v1.1.json \
+    --predict_file $SQUAD_DIR/dev-v1.1.json \
     --learning_rate 3e-5 \
     --num_train_epochs 2 \
     --max_seq_length 384 \
     --doc_stride 128 \
     --output_dir ./examples/models/wwm_uncased_finetuned_squad/ \
-    --per_device_eval_batch_size=3   \
-    --per_device_train_batch_size=3   \
+    --per_gpu_eval_batch_size=3   \
+    --per_gpu_train_batch_size=3   \
 ```
 
 Training with the previously defined hyper-parameters yields the following results:
@@ -60,25 +77,29 @@ exact_match = 86.91
 This fine-tuned model is available as a checkpoint under the reference
 [`bert-large-uncased-whole-word-masking-finetuned-squad`](https://huggingface.co/bert-large-uncased-whole-word-masking-finetuned-squad).
 
-#### Fine-tuning XLNet with beam search on SQuAD
+#### Fine-tuning XLNet on SQuAD
 
-This example code fine-tunes XLNet on both SQuAD1.0 and SQuAD2.0 dataset.
+This example code fine-tunes XLNet on both SQuAD1.0 and SQuAD2.0 dataset. See above to download the data for SQuAD .
 
 ##### Command for SQuAD1.0:
 
 ```bash
-python run_qa_beam_search.py \
+export SQUAD_DIR=/path/to/SQUAD
+
+python run_squad.py \
+    --model_type xlnet \
     --model_name_or_path xlnet-large-cased \
-    --dataset_name squad \
     --do_train \
     --do_eval \
+    --train_file $SQUAD_DIR/train-v1.1.json \
+    --predict_file $SQUAD_DIR/dev-v1.1.json \
     --learning_rate 3e-5 \
     --num_train_epochs 2 \
     --max_seq_length 384 \
     --doc_stride 128 \
     --output_dir ./wwm_cased_finetuned_squad/ \
-    --per_device_eval_batch_size=4  \
-    --per_device_train_batch_size=4   \
+    --per_gpu_eval_batch_size=4  \
+    --per_gpu_train_batch_size=4   \
     --save_steps 5000
 ```
 
@@ -87,19 +108,21 @@ python run_qa_beam_search.py \
 ```bash
 export SQUAD_DIR=/path/to/SQUAD
 
-python run_qa_beam_search.py \
+python run_squad.py \
+    --model_type xlnet \
     --model_name_or_path xlnet-large-cased \
-    --dataset_name squad_v2 \
     --do_train \
     --do_eval \
     --version_2_with_negative \
+    --train_file $SQUAD_DIR/train-v2.0.json \
+    --predict_file $SQUAD_DIR/dev-v2.0.json \
     --learning_rate 3e-5 \
     --num_train_epochs 4 \
     --max_seq_length 384 \
     --doc_stride 128 \
     --output_dir ./wwm_cased_finetuned_squad/ \
-    --per_device_eval_batch_size=2  \
-    --per_device_train_batch_size=2   \
+    --per_gpu_eval_batch_size=2  \
+    --per_gpu_train_batch_size=2   \
     --save_steps 5000
 ```
 
@@ -137,7 +160,7 @@ Larger batch size may improve the performance while costing more memory.
 #### Fine-tuning BERT on SQuAD1.0 with relative position embeddings
 
 The following examples show how to fine-tune BERT models with different relative position embeddings. The BERT model 
-`bert-base-uncased` was pretrained with default absolute position embeddings. We provide the following pretrained 
+`bert-base-uncased` was pre-trained with default absolute position embeddings. We provide the following pre-trained 
 models which were pre-trained on the same training data (BooksCorpus and English Wikipedia) as in the BERT model 
 training, but with different relative position embeddings. 
 
@@ -153,19 +176,24 @@ in Huang et al. [Improve Transformer Models with Better Relative Position Embedd
 ##### Base models fine-tuning
 
 ```bash
+export SQUAD_DIR=/path/to/SQUAD
+output_dir=relative_squad
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 python -m torch.distributed.launch --nproc_per_node=8 ./examples/question-answering/run_squad.py \
+    --model_type bert \
     --model_name_or_path zhiheng-huang/bert-base-uncased-embedding-relative-key-query \
-    --dataset_name squad \
     --do_train \
     --do_eval \
+    --do_lower_case \
+    --train_file $SQUAD_DIR/train-v1.1.json \
+    --predict_file $SQUAD_DIR/dev-v1.1.json \
     --learning_rate 3e-5 \
     --num_train_epochs 2 \
     --max_seq_length 512 \
     --doc_stride 128 \
-    --output_dir relative_squad \
-    --per_device_eval_batch_size=60 \
-    --per_device_train_batch_size=6
+    --output_dir ${output_dir} \
+    --per_gpu_eval_batch_size=60 \
+    --per_gpu_train_batch_size=6
 ```
 Training with the above command leads to the following results. It boosts the BERT default from f1 score of 88.52 to 90.54.
 
@@ -181,17 +209,22 @@ gpu training leads to the f1 score of 90.71.
 ##### Large models fine-tuning
 
 ```bash
+export SQUAD_DIR=/path/to/SQUAD
+output_dir=relative_squad
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 python -m torch.distributed.launch --nproc_per_node=8 ./examples/question-answering/run_squad.py \
+    --model_type bert \
     --model_name_or_path zhiheng-huang/bert-large-uncased-whole-word-masking-embedding-relative-key-query \
-    --dataset_name squad \
     --do_train \
     --do_eval \
+    --do_lower_case \
+    --train_file $SQUAD_DIR/train-v1.1.json \
+    --predict_file $SQUAD_DIR/dev-v1.1.json \
     --learning_rate 3e-5 \
     --num_train_epochs 2 \
     --max_seq_length 512 \
     --doc_stride 128 \
-    --output_dir relative_squad \
+    --output_dir ${output_dir} \
     --per_gpu_eval_batch_size=6 \
     --per_gpu_train_batch_size=2 \
     --gradient_accumulation_steps 3
@@ -215,5 +248,6 @@ python run_tf_squad.py \
     --learning_rate 3e-5 \
     --doc_stride 128    
 ```
+
 
 For the moment evaluation is not available in the Tensorflow Trainer only the training.
